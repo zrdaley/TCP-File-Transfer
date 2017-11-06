@@ -35,6 +35,7 @@ int main(int argc,char **argv) {
     int file_block_size = 0;
     int write_sz = 0;
     int zip_name_length;
+    int file_name_length;
     char* zip_file_name;
     char* file_name;
     char* unzip_command;
@@ -84,11 +85,11 @@ int main(int argc,char **argv) {
         while(file_block_size > 0) {
             printf("Received bytes: %d\n", file_block_size);
             
-            /* Break if write to file fails */
+            /* Exit if write to file fails */
             write_sz = fwrite(recvline, sizeof(char), file_block_size, zip_file);
             if(write_sz < file_block_size) {
                 fprintf(stderr, "File to write failed.\n");
-                break;
+                exit(EXIT_FAILURE);
             }
 
             /* Clear buffer */
@@ -106,18 +107,17 @@ int main(int argc,char **argv) {
         /* Remove .zip extention from sent file name */
         file_name = malloc(zip_name_length);
         strncpy(file_name, zip_file_name, zip_name_length - 4);
-        zip_name_length = zip_name_length - 4;
+        file_name_length = zip_name_length - 4;
 
         /* Unzip file */
-        unzip_command = malloc(zip_name_length + 9);
+        unzip_command = malloc(file_name_length + 9);
         strcpy(unzip_command, "unzip -j ");
         strcat(unzip_command, file_name);
-        printf("COMMAND: %s\n", unzip_command);
         system(unzip_command);
 
         /* Add .txt extension to file name */
         strcat(file_name, ".txt");
-        printf("FILE: %s\n", file_name);
+        file_name_length = file_name_length + 4;
 
         /* Open unzipped file from client */
         FILE *file = fopen(file_name, "r");
@@ -126,16 +126,22 @@ int main(int argc,char **argv) {
             exit(EXIT_FAILURE);
         }
 
+        /* Send .txt filename to client */
+        printf("Sending file: %s\n", file_name);
+        if(write(comm_fd, file_name, file_name_length) < 0) {
+            error("Error sending file name to client");
+            exit(EXIT_FAILURE);
+        }
+
         /* Send unzipped file to client */
         bzero(sendline, 1024); 
         file_block_size = fread(sendline, sizeof(char), 1024, file);
-        printf("Sending file: %s\n", file_name);
         while(file_block_size > 0) {
             
-            /* Break if write to client fails */
+            /* Exit if write to client fails */
             if(write(comm_fd, sendline, file_block_size) < 0) {
                 error("Error sending file to client");
-                break;
+                exit(EXIT_FAILURE);
             }
             printf("Sent bytes: %d\n", file_block_size);
             
@@ -144,7 +150,7 @@ int main(int argc,char **argv) {
 
             /* Break look if this is the final packet */
             if (file_block_size < 1024) {
-                printf("File sent: %s \n", file_name);
+                printf("File succesfully sent: %s \n", file_name);
                 break;
             }
             file_block_size = fread(sendline, sizeof(char), 1024, file);

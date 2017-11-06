@@ -76,25 +76,28 @@ int main(int argc,char **argv) {
 
         /* Break look if this is the final packet */
         if (file_block_size < 1024) {
-            printf("File sent: %s \n", filename);
+            printf("File successfully sent: %s \n", filename);
             break;
         }
         file_block_size = fread(sendline, sizeof(char), 1024, zip_file); 
     }
     fclose(zip_file);
 
+    /* Receive file name */
+    file_block_size = read(sockfd, recvline, 1024);
+    filename = malloc(file_block_size);
+    filename = recvline;
+    printf("Receiving file: %s\n", filename);
+
     /* Create new file */
     bzero(filename, 50); 
     strcpy(filename, "file.txt");
     FILE *file = fopen(filename, "w");
 
-    /* Receive file packets from client and write to the new file */
+    /* Receive file */
     bzero(recvline, 1024); 
     file_block_size = read(sockfd, recvline, 1024);
     write_sz = 0;
-    
-    /* Receive file */
-    printf("Receiving file: %s\n", filename);
     while(file_block_size > 0) { 
         printf("Received bytes: %d\n", file_block_size);
 
@@ -110,7 +113,7 @@ int main(int argc,char **argv) {
 
         /* Break look if this is the final packet */
         if (file_block_size < 1024) {
-            printf("File has been received!\n");
+            printf("File has been received.\n");
             break;
         }
         file_block_size = read(sockfd, recvline, 1024);
