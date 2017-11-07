@@ -51,8 +51,8 @@ int main(int argc,char **argv) {
     clock_t start = clock(), diff;
  
     /* Start send with zip file name */
-    printf("Sending file: %s\n", filename);
-    if((write(sockfd, filename, sizeof(argv[3]))) < 0) {
+    printf("Sending file: %d // %s\n", (int)strlen(argv[3]), filename);
+    if((write(sockfd, filename, strlen(argv[3]))) < 0) {
             printf("Error: Failed to send file %s.\n", filename);
             exit(EXIT_FAILURE);
     }   
@@ -90,8 +90,6 @@ int main(int argc,char **argv) {
     printf("Receiving file: %s\n", filename);
 
     /* Create new file */
-    bzero(filename, 50); 
-    strcpy(filename, "file.txt");
     FILE *file = fopen(filename, "w");
 
     /* Receive file */
