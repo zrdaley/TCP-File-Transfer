@@ -36,9 +36,9 @@ int main(int argc,char **argv) {
     int write_sz = 0;
     int zip_name_length;
     int file_name_length;
-    char* zip_file_name;
-    char* file_name;
-    char* unzip_command;
+    char zip_file_name[100];
+    char file_name[100];
+    char unzip_command[100];
  
     /* Initialize socket */
     listen_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -70,7 +70,6 @@ int main(int argc,char **argv) {
         /* Read filename */
         bzero(recvline, 1024); 
         file_block_size = read(comm_fd, recvline, 1024);
-        zip_file_name = malloc(file_block_size);
         strcpy(zip_file_name, recvline);
         zip_name_length = file_block_size;
         printf("Receiving file: %s\n", zip_file_name);
@@ -82,8 +81,22 @@ int main(int argc,char **argv) {
         bzero(recvline, 1024); 
         file_block_size = read(comm_fd, recvline, 1024);
         write_sz = 0;
-        while(file_block_size > 0) {
+
+        while(1) {
+	    if (file_block_size < 0) {
+                exit(EXIT_FAILURE);
+            }
             printf("Received bytes: %d\n", file_block_size);
+            
+	    /* Break loop if this is the final packet */
+            if (strcmp(&recvline[file_block_size - 5], "EOF;;")==0) {
+		write_sz = fwrite(recvline, sizeof(char), file_block_size-5, zip_file);
+		if(write_sz < file_block_size - 5) {
+                    fprintf(stderr, "File to write failed.\n");
+                    exit(EXIT_FAILURE);
+            	}
+                break;
+            }
             
             /* Exit if write to file fails */
             write_sz = fwrite(recvline, sizeof(char), file_block_size, zip_file);
@@ -93,29 +106,24 @@ int main(int argc,char **argv) {
             }
 
             /* Clear buffer */
-            bzero(recvline, 1024);
-
-            /* Break look if this is the final packet */
-            if (file_block_size < 1024) {
-                printf("File has been received.\n");
-                break;
-            }
+            bzero(recvline, 1024);   
             file_block_size = read(comm_fd, recvline, 1024);
         }
+	printf("File has been received.\n");
         fclose(zip_file);
 
         /* Remove .zip extention from sent file name */
-        file_name = malloc(zip_name_length);
         strncpy(file_name, zip_file_name, zip_name_length - 4);
+	strcat(unzip_command, "\0");
         file_name_length = zip_name_length - 4;
 
         /* Unzip file */
-        unzip_command = malloc(file_name_length + 9);
         strcpy(unzip_command, "unzip -j ");
         strcat(unzip_command, file_name);
+	strcat(unzip_command, "\0");
         system(unzip_command);
 
-        /* Add .txt extension to file name */
+	/* Add .txt extension to file name */
         strcat(file_name, ".txt");
         file_name_length = file_name_length + 4;
 
@@ -159,6 +167,11 @@ int main(int argc,char **argv) {
 
         /* Close socket */
         if(close(comm_fd) < 0) error("Close socket error");
+	
+	bzero(file_name, 100);
+	bzero(zip_file_name, 100);
+
+	
     }
 
 }

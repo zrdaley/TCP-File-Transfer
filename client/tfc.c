@@ -54,6 +54,7 @@ int main(int argc,char **argv) {
     printf("Sending file: %d // %s\n", (int)strlen(argv[3]), filename);
     if((write(sockfd, filename, strlen(argv[3]))) < 0) {
             printf("Error: Failed to send file %s.\n", filename);
+	    close(sockfd);
             exit(EXIT_FAILURE);
     }   
 
@@ -63,10 +64,11 @@ int main(int argc,char **argv) {
     int write_sz;
    
     /* Send all file packets */
-    while(file_block_size > 0) {
+    while(file_block_size <= 1024) {
         /* Break if write to server fails */
         if(write(sockfd, sendline, file_block_size) < 0) {
             printf("Error: Failed to send file %s.\n", filename);
+	    close(sockfd);
             exit(EXIT_FAILURE);
         }
         printf("Sent bytes: %d\n", file_block_size);
@@ -75,12 +77,18 @@ int main(int argc,char **argv) {
         bzero(sendline, 1024);
 
         /* Break look if this is the final packet */
-        if (file_block_size < 1024) {
-            printf("File successfully sent: %s \n", filename);
+        if (file_block_size < 1024) {  
             break;
         }
         file_block_size = fread(sendline, sizeof(char), 1024, zip_file); 
     }
+    strcpy(sendline, "EOF;;");
+    if(write(sockfd, sendline, 5) < 0) {
+            printf("Error: Failed to send file %s.\n", filename);
+	    close(sockfd);
+            exit(EXIT_FAILURE);
+    }
+    printf("File successfully sent: %s \n", filename);
     fclose(zip_file);
 
     /* Receive file name */
@@ -110,7 +118,7 @@ int main(int argc,char **argv) {
         bzero(recvline, 1024);
 
         /* Break look if this is the final packet */
-        if (file_block_size < 1024) {
+        if (file_block_size == 0) {
             printf("File has been received.\n");
             break;
         }
@@ -119,7 +127,7 @@ int main(int argc,char **argv) {
     fclose(file);
     close(sockfd);
 
-    diff = clock();
-    printf("**Time taken: %d milliseconds**\n", (int)diff);
+    diff = clock() - start;
+    printf("**Time taken: %d milliseconds**\n", (int)(diff * 1000 / CLOCKS_PER_SEC));
  
 }
